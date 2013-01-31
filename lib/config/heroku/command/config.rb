@@ -14,10 +14,11 @@ class Heroku::Command::Config
   def pull
     interactive = options[:interactive]
     overwrite   = options[:overwrite]
+    env = options[:env]
 
-    config = merge_config(remote_config, local_config, interactive, overwrite)
-    write_local_config config
-    display "Config for #{app} written to .env"
+    config = merge_config(remote_config, local_config(env), interactive, overwrite)
+    write_local_config config, env
+    display "Config for #{app} written to #{filename(env)}"
   end
 
   # config:push
@@ -32,16 +33,20 @@ class Heroku::Command::Config
   def push
     interactive = options[:interactive]
     overwrite   = options[:overwrite]
+    env = options[:env]
 
-    config = merge_config(local_config, remote_config, interactive, overwrite)
+    config = merge_config(local_config(env), remote_config, interactive, overwrite)
     write_remote_config config
-    display "Config in .env written to #{app}"
+    display "Config in #{filename(env)} written to #{app}"
   end
 
 private ######################################################################
+  def filename(env)
+    ".env#{env ? '-'+env :''}"
+  end
 
-  def local_config
-    File.read(".env").split("\n").inject({}) do |hash, line|
+  def local_config(env=nil)
+    File.read(filename(env)).split("\n").inject({}) do |hash, line|
       if line =~ /\A([A-Za-z0-9_]+)=(.*)\z/
         hash[$1] = $2
       end
@@ -55,8 +60,8 @@ private ######################################################################
     api.get_config_vars(app).body
   end
 
-  def write_local_config(config)
-    File.open(".env", "w") do |file|
+  def write_local_config(config, env=nil)
+    File.open(filename(env), "w") do |file|
       config.keys.sort.each do |key|
         file.puts "#{key}=#{config[key]}"
       end
